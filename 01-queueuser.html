@@ -1,0 +1,178 @@
+<script type="text/x-red" data-template-name="queueuser">
+  <div class="form-row">
+    <label for="node-input-broker"><i class="fa fa-globe"></i> Broker</label>
+    <input type="text" id="node-input-broker">
+  </div>
+  <div class="form-row">
+    <label for="node-input-topic"><i class="fa fa-tasks"></i> Topic</label>
+    <input type="text" id="node-input-topic">
+  </div>
+  <div class="form-row">
+    <label for="node-input-msgaction">Action</label>
+    <select id="node-input-msgaction" style="width:73%">
+      <option value="add" selected>"add" = Add element</option>
+      <option value="drop">"drop" = Delete element</option>
+      <option value="cons">"cons" = Go to the next element</option>
+      <option value="dump">"dump" = Display queue in debug</option>
+      <option value="clear">"clear" = Clear the queue</option>
+    </select>
+  </div>
+  <div id="callbackTopic" display="block">
+    <div class="form-row">
+    <label for="node-input-callbackTopic"><i class="fa fa-tasks"></i> callback topic</label>
+    <input type="text" id="node-input-callbackTopic">
+    </div>
+  </div>
+  <div id="addAction" display="block">
+    <div class="form-row">
+    <label for="node-input-ttl">Time to live</label>
+    <input class="queueuser-ttl" id="node-input-ttl" value="0" style="width:40px !important">
+    </div>
+    <div class="form-row">
+    <label for="node-input-element">Element</label>
+    <input type="text" id="node-input-element" value="" style="width:70%">
+    </div>
+    <div class="form-row">
+    <label for="node-input-msgtype">Type</label>
+    <input type="text" id="node-input-msgtype" value="Text" style="width:70%">
+    </div>
+    <div class="form-row">
+    <label for="node-input-over">Where</label>
+    <select id="node-input-over" style="width:73%">
+      <option value="addEnd" selected>Add in the bottom</option>
+      <option value="addStart">Add in the top</option>
+      <option value="replace">Replace</option>
+    </select>
+    </div>
+  </div>
+</script>
+
+<script type="text/x-red" data-help-name="queueuser">
+Use the flow "Queue Manager".
+
+<br/><b>Topic</b> is the queue to use for your element.
+<ul>
+  <li>use the topic "LEDMatrix" to have a default word processing</li>
+  <li>use the topic "Sound" to have a default sound processing</li>
+</ul>
+
+<b>msg.msgaction</b> can be :
+<ul>
+  <li><b>add</b> : add a element to the queue</li>
+  <li><b>drop</b> : to drop the current element. The sequence's pointer is set to the next element and cons's action is call with callbackTopic</li>
+  <li><b>cons</b> : consume he current sequence's element = Send the current element on the topic given on callbackTopic at the call of "cons". Decrement the ttl, drop the element if need and set the next element as the current element. Drop's action will set automatically the next element as current, so cons's action will not set it if it will call drop. If callbackTopic isn't set, the element is sent on sequenceCallback/def by default. Like the next element is set immediately, the element to drop is save.</li>
+  <li><b>dump</b> : display the queue in debug tab</li>
+  <li><b>clear</b> : clear the queue</li>
+</ul>
+</br>
+If you choose <b>add</b>, you can set :
+<ul>
+  <li><b>ttl</b> : time to live for the element. Possible values are: </br>
+  <ul>
+    <li> <b>0</b> : the element needs to be explicitely destroyed (or overwritten by another element of the same type).</li>
+    <li> <b>n</b> : the element will be displayed n times prior to be automatically dropped.</li>
+  </ul>
+  </li>
+  <li><b>element</b> : the element to add. If empty, the msg send on this node will be use</li>
+  <li><b>msgtype</b> : type of the element (to avoid, eventually, double elements of a same type)</li>
+  <li><b>over</b> : to specify the rule to apply to define the position of the elements to add, and to define  what to do if an element of the same type already exists in this sequence. Possible values are:</br>
+  <ul>
+    <li> <b>replace</b> : if some elements with the same type are already be added, it will replace the next occurrence by the new element. Else, it will add the new element at the end of the queue</li>
+    <li> <b>addStart</b> : add the element to the top of the queue (Last in, first out)</li>
+    <li> <b>addEnd</b> or other value : add the element to the bottom of the queue (first in, first out)</li>
+  </ul>
+  </li>
+</ul>
+
+<br/><b>msg.callbackTopic</b> is the MQTT topic will be call to send element.
+<ul>
+  <li>For display on ledmatrix, use "LedMatrix/display".</li>
+  <li>For play a music, use "sound/play"</li>
+  <li>For play a vocalized text, use "tts/en" or "tts/fr"</li>
+</ul>
+
+</script>
+
+<script type="text/javascript">
+  RED.nodes.registerType('queueuser',{
+    category: "ledmatrix",
+    defaults: {
+      msgaction : {value:"",required:true},
+      element : {value:""},
+      msgtype : {value:""},
+      over : {value:""},
+      ttl : {value:""},
+      callbackTopic : {value:""},
+      broker: {type:"mqtt-broker", required:true},
+      topic: {type:'queue-topic', required:true}
+    },
+    inputs:1,
+    outputs:1,
+    color: "#2196f3",
+    paletteLabel: "queue user",
+    label: function() {
+      var lab = "queue user";
+      switch(this.msgaction){
+        case "add":
+          lab = "Add element";
+          break;
+        case "drop":
+          lab = "Delete element";
+          break;
+        case "cons":
+          lab = "Show the next element";
+          break;
+        case "dump":
+          lab = "Show the queue in debug tab";
+          break;
+        case "clear":
+          lab = "Clear the queue";
+          break;
+      }
+      return lab;
+    },
+    labelStyle: function() {
+      return this.msgaction ? "node_label_italic":"";
+    },
+    oneditprepare: function(){
+      $(".queueuser-ttl").spinner({
+        min:0
+      });
+
+      $("#node-input-msgaction").on('change',function(){
+      if( $(this).val() != "add"){
+        $("#addAction").hide();
+      } else {
+        $("#addAction").show();
+      }
+
+      if( $(this).val() == "clear" || $(this).val() == "dump"){
+        $("#callbackTopic").hide();
+      } else {
+        $("#callbackTopic").show();
+      }
+
+      })
+    }
+  });
+</script>
+
+<script type="text/x-red" data-template-name="queue-topic">
+  <div class="form-row">
+    <label for="node-config-input-topic"><i class="fa fa-task"></i> Topic</label>
+    <input type="text" id="node-config-input-topic">
+  </div>
+</script>
+
+<script type="text/javascript">
+  RED.nodes.registerType('queue-topic',{
+    category: 'config',
+    defaults: {
+      topic: {value:"",required:true}
+    },
+    label: function() {
+      if (this.topic == "") { this.topic = "default"; }
+      return "Queue : "+this.topic;
+    }
+  });
+</script>

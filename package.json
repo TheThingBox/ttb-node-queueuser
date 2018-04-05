@@ -1,0 +1,9 @@
+{
+  "name": "queueuser",
+  "version": "0.1.0",
+  "node-red": {
+    "nodes": {
+      "queueuser": "01-queueuser.js"
+    }
+  }
+}
